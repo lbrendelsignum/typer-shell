@@ -20,7 +20,7 @@ def make_typer_shell(
         params: Optional[dict] = None,
         params_path: Optional[Path] = None,
         launch: Callable = lambda ctx: None,
-) -> None:
+) -> Typer:
     """Create a typer shell
         'default' is a default command to run if no command is found
         'obj' is an object to pass to the context
