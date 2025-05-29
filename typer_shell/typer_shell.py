@@ -1,18 +1,18 @@
+import contextlib
 import os
 import tempfile
-from typing_extensions import Annotated
-from typing import Optional, Callable
 from pathlib import Path
+from typing import Callable, Optional
 
-import yaml
 import click
+import yaml
 from click_shell import make_click_shell
-from typer import Context, Typer, Argument
+from rich import print  # noqa: A004
+from typer import Argument, Context, Typer
+from typing_extensions import Annotated
 
-from rich import print
 
-
-def make_typer_shell(
+def make_typer_shell(  # noqa: PLR0913
     prompt: str = ">> ",
     on_finished: Callable = lambda ctx: None,
     intro: str = "\n Welcome to typer-shell! Type help to see commands.\n",
@@ -75,14 +75,14 @@ def _obj(
         return
 
     # First ensure obj
-    if obj and not getattr(ctx, "obj"):
+    if obj and not ctx.obj:
         ctx.obj = obj
-    elif obj and getattr(ctx, "obj"):
+    elif obj and ctx.obj:
         if os.getenv("DEBUG", None):
             print(
-                "Warning: There is already an object in the context. The new object will not be added."
+                "Warning: There is already an object in the context. The new object will not be added.",
             )
-    elif not obj and not getattr(ctx, "obj") and params:
+    elif not obj and not ctx.obj and params:
 
         class _obj:
             pass
@@ -111,7 +111,7 @@ def add_params(ctx, params, params_path, name):
 def help(ctx: Context, command: Annotated[Optional[str], Argument()] = None):
     if command == "help":
         print(
-            "\n Type 'command --help' or 'help <command>' for help on a specific command."
+            "\n Type 'command --help' or 'help <command>' for help on a specific command.",
         )
         # print(Panel(
         #     "You have found the secret double help!\n"
@@ -139,7 +139,8 @@ def _default(line: str):
     """
     ctx = click.get_current_context()
     default_cmd = ctx.command.get_command(ctx, "default") or ctx.command.get_command(
-        ctx, "help"
+        ctx,
+        "help",
     )
     if default_cmd.name == "help":
         ctx.invoke(default_cmd, ctx=ctx, command=line)
@@ -149,14 +150,14 @@ def _default(line: str):
     # the arguments as appropriate.
 
 
-def shell(ctx: Context):
+def shell(_ctx: Context) -> None:
     """Drop into an ipython shell"""
     import IPython
 
     IPython.embed(globals_=globals())
 
 
-def save(ctx: Context):
+def save(ctx: Context) -> None:
     """(s) Save the local params to a file"""
     params = ctx.obj.params_groups[ctx.parent.command.name]["params"]
     path = ctx.obj.params_groups[ctx.parent.command.name]["path"]
@@ -164,13 +165,13 @@ def save(ctx: Context):
     print(f"Saved params to {path}")
 
 
-def _save(path, params):
+def _save(path: Path, params) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
         yaml.dump(params, f)
 
 
-def load(ctx: Context):
+def load(ctx: Context) -> None:
     """(l) Load the local params from a file"""
     path = ctx.obj.params_groups[ctx.parent.command.name]["path"]
     with path.open("r") as f:
@@ -185,7 +186,7 @@ def update(
     value: Annotated[Optional[str], Argument()] = None,
     kv: Annotated[Optional[str], Argument()] = None,
 ):
-    "(u) Update a config value, or set of values. (kv in the form of 'name1=value1,name2=value2')"
+    """(u) Update a config value, or set of values. (kv in the form of 'name1=value1,name2=value2')"""
     params = ctx.obj.params_groups[ctx.parent.command.name]["params"]
     if kv:
         updates = kv.split(",")
@@ -204,10 +205,8 @@ def update(
 
 
 def _update(key, value, dict):
-    try:
+    with contextlib.suppress(SyntaxError, NameError):
         value = eval(value)
-    except (SyntaxError, NameError):
-        pass
 
     # If the value is a string, fix \ns (they should be proper newlines)
     if isinstance(value, str):
@@ -225,7 +224,7 @@ def _print(ctx: Context, value: Annotated[Optional[str], Argument()] = None):
         print(params)
 
 
-def get_params(ctx, name=None):
+def get_params(ctx, name: str | None = None):
     return get_params_full(ctx, name).get("params", {})
 
 
@@ -233,7 +232,7 @@ def get_params_path(ctx, name=None):
     return Path(get_params_full(ctx, name).get("path", ""))
 
 
-def get_params_full(ctx, _name=None):
+def get_params_full(ctx: Context, _name: str | None = None):
     name = _name or ctx.command.name
     if name not in ctx.obj.params_groups:
         if ctx.parent and _name is None:
